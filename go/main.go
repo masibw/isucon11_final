@@ -623,9 +623,24 @@ func (h *handlers) GetGrades(c echo.Context) error {
 	}
 
 	var totalsWithID []Total
-	totalQuery := "SELECT IFNULL(SUM(`submissions`.`score`), 0) AS `total_score` , MAX(`courses`.`id`) AS id FROM `users` JOIN `registrations` ON `users`.`id` = `registrations`.`user_id` JOIN `courses` ON `registrations`.`course_id` = `courses`.`id` LEFT JOIN `classes` ON `courses`.`id` = `classes`.`course_id` LEFT JOIN `submissions` ON `users`.`id` = `submissions`.`user_id` AND `submissions`.`class_id` = `classes`.`id` WHERE `courses`.`id` IN (" +
+	// totalQuery := "SELECT IFNULL(SUM(`submissions`.`score`), 0) AS `total_score`" +
+	// 	" FROM `users`" +
+	// 	" JOIN `registrations` ON `users`.`id` = `registrations`.`user_id`" +
+	// 	" JOIN `courses` ON `registrations`.`course_id` = `courses`.`id`" +
+	// 	" LEFT JOIN `classes` ON `courses`.`id` = `classes`.`course_id`" +
+	// 	" LEFT JOIN `submissions` ON `users`.`id` = `submissions`.`user_id` AND `submissions`.`class_id` = `classes`.`id`" +
+	// 	" WHERE `courses`.`id` IN (" +
+	// 	courceQuery +
+	// 	") GROUP BY `users`.`id`"
+
+	// courseをうけている生徒のスコアの合計値とcourse_id
+	// user1 <-> 200
+	// user2 <-> 300
+	//
+
+	totalQuery := "SELECT IFNULL(SUM(`submissions`.`score`), 0) AS `total_score`, `courses`.`id` AS id FROM `users` JOIN `registrations` ON `users`.`id` = `registrations`.`user_id` JOIN `courses` ON `registrations`.`course_id` = `courses`.`id` LEFT JOIN `classes` ON `courses`.`id` = `classes`.`course_id` LEFT JOIN `submissions` ON `users`.`id` = `submissions`.`user_id` AND `submissions`.`class_id` = `classes`.`id` WHERE `courses`.`id` IN (" +
 		courceQuery +
-		") GROUP BY `users`.`id`"
+		") GROUP BY `users`.`id`,`courses`.`id`"
 
 	if err := h.DB.Select(&totalsWithID, totalQuery); err != nil {
 		c.Logger().Error(err)
@@ -719,6 +734,10 @@ func (h *handlers) GetGrades(c echo.Context) error {
 			}
 		}
 		// この科目を履修している学生のTotalScore一覧を取得
+		// 三つ 1. 一人の生徒がどのコースに何点合計撮ったか
+		// course_id 100
+		// course_id 101
+		// course_id 391
 		// こいつを改善
 		var totals []int
 		for _, s := range totalsWithID {
@@ -762,6 +781,7 @@ func (h *handlers) GetGrades(c echo.Context) error {
 
 	// GPAの統計値
 	// 一つでも修了した科目がある学生のGPA一覧
+	// course -> class -> submission <- user
 	var gpas []float64
 	query = "SELECT IFNULL(SUM(`submissions`.`score` * `courses`.`credit`), 0) / 100 / `credits`.`credits` AS `gpa`" +
 		" FROM `users`" +
