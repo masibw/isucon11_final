@@ -586,6 +586,11 @@ type Sub struct {
 	Score    *int   `db:"score"`
 }
 
+type Total struct {
+	Score    int    `db:"total_score"`
+	CourceID string `db:"id"`
+}
+
 // GetGrades GET /api/users/me/grades 成績取得
 func (h *handlers) GetGrades(c echo.Context) error {
 	userID, _, _, err := getUserInfo(c)
@@ -609,6 +614,59 @@ func (h *handlers) GetGrades(c echo.Context) error {
 	courseResults := make([]CourseResult, 0, len(registeredCourses))
 	myGPA := 0.0
 	myCredits := 0
+
+	courceQuery := ""
+	for idx, c := range registeredCourses {
+		if idx == 0 {
+			courceQuery += "'" + c.ID + "'"
+		} else {
+			courceQuery += ", "
+			courceQuery += "'" + c.ID + "'"
+		}
+	}
+
+	var totalsWithID []Total
+	// totalQuery := "SELECT IFNULL(SUM(`submissions`.`score`), 0) AS `total_score`" +
+	// 	" FROM `users`" +
+	// 	" JOIN `registrations` ON `users`.`id` = `registrations`.`user_id`" +
+	// 	" JOIN `courses` ON `registrations`.`course_id` = `courses`.`id`" +
+	// 	" LEFT JOIN `classes` ON `courses`.`id` = `classes`.`course_id`" +
+	// 	" LEFT JOIN `submissions` ON `users`.`id` = `submissions`.`user_id` AND `submissions`.`class_id` = `classes`.`id`" +
+	// 	" WHERE `courses`.`id` IN (" +
+	// 	courceQuery +
+	// 	") GROUP BY `users`.`id`"
+
+	// courseをうけている生徒のスコアの合計値とcourse_id
+	// user1 <-> 200
+	// user2 <-> 300
+	//
+
+	totalQuery := "SELECT IFNULL(SUM(`submissions`.`score`), 0) AS `total_score`, `courses`.`id` AS id FROM `users` JOIN `registrations` ON `users`.`id` = `registrations`.`user_id` JOIN `courses` ON `registrations`.`course_id` = `courses`.`id` LEFT JOIN `classes` ON `courses`.`id` = `classes`.`course_id` LEFT JOIN `submissions` ON `users`.`id` = `submissions`.`user_id` AND `submissions`.`class_id` = `classes`.`id` WHERE `courses`.`id` IN (" +
+		courceQuery +
+		") GROUP BY `users`.`id`,`courses`.`id`"
+
+	if err := h.DB.Select(&totalsWithID, totalQuery); err != nil {
+		c.Logger().Error(err)
+		return c.NoContent(http.StatusInternalServerError)
+	}
+	fmt.Printf("TOSA_DEBGU_TOTAL_QUERY:%v\n", totalQuery)
+	fmt.Printf("TOSA_DEBGU_DATA:%v\n", totalsWithID)
+	// var classList []Class
+	// query = "SELECT *" +
+	// 	" FROM `classes`" +
+	// 	" WHERE `course_id` IN (" +
+	// 	courceQuery +
+	// 	")" +
+	// 	" ORDER BY `part` DESC"
+	// if err := h.DB.Select(&classList, query); err != nil {
+	// 	c.Logger().Error(err)
+	// 	return c.NoContent(http.StatusInternalServerError)
+	// }
+	// classMap := make(map[string]*Class)
+	// for _, c := range classList {
+	// 	classMap[c.CourseID] = &c
+	// }
+
 	for _, course := range registeredCourses {
 		// 講義一覧の取得
 		var classes []Class
@@ -680,55 +738,30 @@ func (h *handlers) GetGrades(c echo.Context) error {
 			}
 
 		}
-
-		// ここまで追加
-
-		// for _, class := range classes {
-		// 	var submissionsCount int
-		// 	if err := h.DB.Get(&submissionsCount, "SELECT COUNT(*) FROM `submissions` WHERE `class_id` = ?", class.ID); err != nil {
-		// 		c.Logger().Error(err)
-		// 		return c.NoContent(http.StatusInternalServerError)
-		// 	}
-
-		// 	var myScore sql.NullInt64
-		// 	if err := h.DB.Get(&myScore, "SELECT `submissions`.`score` FROM `submissions` WHERE `user_id` = ? AND `class_id` = ?", userID, class.ID); err != nil && err != sql.ErrNoRows {
-		// 		c.Logger().Error(err)
-		// 		return c.NoContent(http.StatusInternalServerError)
-		// 	} else if err == sql.ErrNoRows || !myScore.Valid {
-		// 		classScores = append(classScores, ClassScore{
-		// 			ClassID:    class.ID,
-		// 			Part:       class.Part,
-		// 			Title:      class.Title,
-		// 			Score:      nil,
-		// 			Submitters: submissionsCount,
-		// 		})
-		// 	} else {
-		// 		score := int(myScore.Int64)
-		// 		myTotalScore += score
-		// 		classScores = append(classScores, ClassScore{
-		// 			ClassID:    class.ID,
-		// 			Part:       class.Part,
-		// 			Title:      class.Title,
-		// 			Score:      &score,
-		// 			Submitters: submissionsCount,
-		// 		})
-		// 	}
-		// }
-
 		// この科目を履修している学生のTotalScore一覧を取得
+		// 三つ 1. 一人の生徒がどのコースに何点合計撮ったか
+		// course_id 100
+		// course_id 101
+		// course_id 391
+		// こいつを改善
 		var totals []int
-		query := "SELECT IFNULL(SUM(`submissions`.`score`), 0) AS `total_score`" +
-			" FROM `users`" +
-			" JOIN `registrations` ON `users`.`id` = `registrations`.`user_id`" +
-			" JOIN `courses` ON `registrations`.`course_id` = `courses`.`id`" +
-			" LEFT JOIN `classes` ON `courses`.`id` = `classes`.`course_id`" +
-			" LEFT JOIN `submissions` ON `users`.`id` = `submissions`.`user_id` AND `submissions`.`class_id` = `classes`.`id`" +
-			" WHERE `courses`.`id` = ?" +
-			" GROUP BY `users`.`id`"
-		if err := h.DB.Select(&totals, query, course.ID); err != nil {
-			c.Logger().Error(err)
-			return c.NoContent(http.StatusInternalServerError)
+		for _, s := range totalsWithID {
+			if s.CourceID == course.ID {
+				totals = append(totals, s.Score)
+			}
 		}
+		// query := "SELECT IFNULL(SUM(`submissions`.`score`), 0) AS `total_score`" +
+		// 	" FROM `users`" +
+		// 	" JOIN `registrations` ON `users`.`id` = `registrations`.`user_id`" +
+		// 	" JOIN `courses` ON `registrations`.`course_id` = `courses`.`id`" +
+		// 	" LEFT JOIN `classes` ON `courses`.`id` = `classes`.`course_id`" +
+		// 	" LEFT JOIN `submissions` ON `users`.`id` = `submissions`.`user_id` AND `submissions`.`class_id` = `classes`.`id`" +
+		// 	" WHERE `courses`.`id` = ?" +
+		// 	" GROUP BY `users`.`id`"
+		// if err := h.DB.Select(&totals, query, course.ID); err != nil {
+		// 	c.Logger().Error(err)
+		// 	return c.NoContent(http.StatusInternalServerError)
+		// }
 
 		courseResults = append(courseResults, CourseResult{
 			Name:             course.Name,
@@ -753,6 +786,7 @@ func (h *handlers) GetGrades(c echo.Context) error {
 
 	// GPAの統計値
 	// 一つでも修了した科目がある学生のGPA一覧
+	// course -> class -> submission <- user
 	var gpas []float64
 	query = "SELECT IFNULL(SUM(`submissions`.`score` * `courses`.`credit`), 0) / 100 / `credits`.`credits` AS `gpa`" +
 		" FROM `users`" +
