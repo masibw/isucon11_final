@@ -655,12 +655,13 @@ func (h *handlers) GetGrades(c echo.Context) error {
 
 			for _, sub := range submissions {
 				classCountMp[sub.ClassID]++
-				for _, item := range submissions {
-					if userID == item.UserID {
-						scoreMp[sub.ClassID] = item.Score
-						if item.Score != nil {
-							myTotalScore += *item.Score
-						}
+			}
+
+			for _, item := range submissions {
+				if userID == item.UserID {
+					scoreMp[item.ClassID] = item.Score
+					if item.Score != nil {
+						myTotalScore += *item.Score
 					}
 				}
 			}
