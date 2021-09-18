@@ -782,9 +782,6 @@ func (h *handlers) SearchCourses(c echo.Context) error {
 		args = append(args, status)
 	}
 
-	condition += " AND `courses`.`code` >= ? "
-	condition += " ORDER BY `courses`.`code`"
-
 	var page int
 	if c.QueryParam("page") == "" {
 		page = 1
@@ -804,6 +801,8 @@ func (h *handlers) SearchCourses(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 	// limitより多く上限を設定し、実際にlimitより多くレコードが取得できた場合は次のページが存在する
+	condition += " AND `courses`.`code` >= ? "
+	condition += " ORDER BY `courses`.`code`"
 	condition += " LIMIT ?"
 	args = append(args, code, limit+1)
 
