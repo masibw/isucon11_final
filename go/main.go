@@ -715,10 +715,9 @@ func (h *handlers) GetGrades(c echo.Context) error {
 
 // ---------- Courses API ----------
 
-func GetSeekCoursesCode(db *sqlx.DB, condition string, args []interface{}, offset int) (string, error) {
+func GetSeekCoursesCode(db *sqlx.DB, query string, condition string, args []interface{}, offset int) (string, error) {
 	var codes []string
 	args = append(args, offset)
-	query := `SELECT code FROM courses ORDER BY code where 1=1`
 	query += condition
 	query += `LIMIT 1 OFFSET ?`
 	fmt.Println("masi seek debug: ", query, args)
@@ -799,7 +798,7 @@ func (h *handlers) SearchCourses(c echo.Context) error {
 	limit := 20
 	offset := limit * (page - 1)
 
-	code, err := GetSeekCoursesCode(h.DB, condition, args, offset)
+	code, err := GetSeekCoursesCode(h.DB, query, condition, args, offset)
 	if err != nil {
 		c.Logger().Error(err)
 		return c.NoContent(http.StatusInternalServerError)
