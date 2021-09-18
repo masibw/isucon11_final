@@ -718,7 +718,7 @@ func (h *handlers) GetGrades(c echo.Context) error {
 func GetSeekCoursesCode(db *sqlx.DB, query string, condition string, args []interface{}, offset int) (string, error) {
 	var codes []string
 	args = append(args, offset)
-	condition += "ORDER BY `courses`.`code` "
+	condition += " ORDER BY `courses`.`code` "
 	codeQuery := strings.Replace(query, "SELECT `courses`.*, `users`.`name` AS `teacher`", "SELECT `courses`.`code` ", 1)
 	codeQuery += condition
 	codeQuery += ` LIMIT 1 OFFSET ?`
