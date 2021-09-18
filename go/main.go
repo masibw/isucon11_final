@@ -18,8 +18,6 @@ import (
 	"strings"
 	"time"
 
-	_ "net/http/pprof"
-
 	"github.com/go-sql-driver/mysql"
 	"github.com/gorilla/sessions"
 	"github.com/jmoiron/sqlx"
@@ -46,19 +44,11 @@ type handlers struct {
 
 func main() {
 
-	// GradeCache
-	// userGradeCache = make(map[string]GetGradeResponse)
-
-	go func() {
-		log.Println(http.ListenAndServe("0.0.0.0:6060", nil))
-	}()
-
 	e := echo.New()
 	e.Debug = GetEnv("DEBUG", "") == "true"
 	e.Server.Addr = fmt.Sprintf(":%v", GetEnv("PORT", "7000"))
 	e.HideBanner = true
 
-	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
 	e.Use(session.Middleware(sessions.NewCookieStore([]byte("trapnomura"))))
 
@@ -641,6 +631,7 @@ func (h *handlers) GetGrades(c echo.Context) error {
 	// user2 <-> 300
 	//
 
+	// 自分で集計する
 	totalQuery := "SELECT IFNULL(SUM(`submissions`.`score`), 0) AS `total_score`, `courses`.`id` AS id FROM `users` JOIN `registrations` ON `users`.`id` = `registrations`.`user_id` JOIN `courses` ON `registrations`.`course_id` = `courses`.`id` LEFT JOIN `classes` ON `courses`.`id` = `classes`.`course_id` LEFT JOIN `submissions` ON `users`.`id` = `submissions`.`user_id` AND `submissions`.`class_id` = `classes`.`id` WHERE `courses`.`id` IN (" +
 		courceQuery +
 		") GROUP BY `users`.`id`,`courses`.`id`"
@@ -649,8 +640,6 @@ func (h *handlers) GetGrades(c echo.Context) error {
 		c.Logger().Error(err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
-	fmt.Printf("TOSA_DEBGU_TOTAL_QUERY:%v\n", totalQuery)
-	fmt.Printf("TOSA_DEBGU_DATA:%v\n", totalsWithID)
 	// var classList []Class
 	// query = "SELECT *" +
 	// 	" FROM `classes`" +
@@ -700,8 +689,6 @@ func (h *handlers) GetGrades(c echo.Context) error {
 			querySubmissions := "SELECT user_id, class_id, score FROM `submissions` WHERE class_id IN ("
 			querySubmissions += inquery
 			querySubmissions += ")"
-
-			fmt.Printf("TOSA_DEBUG_IN_QUERY:%v\n", querySubmissions)
 
 			var submissions []Sub
 			err := h.DB.Select(&submissions, querySubmissions)
@@ -1536,7 +1523,6 @@ func (h *handlers) GetAnnouncementList(c echo.Context) error {
 
 	if !errors.Is(err, sql.ErrNoRows) {
 		if err := tx.Select(&announcements, query, args...); err != nil {
-			log.Printf("TOSA_DEBUG:%v", query)
 			c.Logger().Error(err)
 			return c.NoContent(http.StatusInternalServerError)
 		}
