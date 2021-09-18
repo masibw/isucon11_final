@@ -592,7 +592,7 @@ type Total struct {
 }
 
 type ForGPA struct {
-	Score   int    `db:"score"`
+	Score   *int   `db:"score"`
 	Credit  uint8  `db:"credit"`
 	UCredit uint8  `db:"u_credit"`
 	UserID  string `db:"user_id"`
@@ -823,7 +823,10 @@ func (h *handlers) GetGrades(c echo.Context) error {
 			usermap[d.UserID] = 0
 		}
 
-		usermap[d.UserID] += int(d.Credit) * d.Score
+		if d.Score != nil {
+
+			usermap[d.UserID] += int(d.Credit) * d.Score
+		}
 
 		usermap2[d.UserID] += int(d.UCredit)
 	}
