@@ -63,7 +63,8 @@ func main() {
 		log.Println(err)
 		time.Sleep(time.Second * 1)
 	}
-	db.SetMaxOpenConns(10)
+	db.SetMaxOpenConns(30)
+	db.SetMaxIdleConns(15)
 
 	h := &handlers{
 		DB: db,
