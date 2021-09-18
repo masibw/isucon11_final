@@ -803,6 +803,7 @@ func (h *handlers) SearchCourses(c echo.Context) error {
 	condition += " LIMIT ?"
 	args = append(args, code, limit+1)
 
+	fmt.Println("masi debug", query+condition, args)
 	// 結果が0件の時は空配列を返却
 	res := make([]GetCourseDetailResponse, 0)
 	if err := h.DB.Select(&res, query+condition, args...); err != nil {
