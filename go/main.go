@@ -1353,19 +1353,8 @@ func (h *handlers) GetAnnouncementList(c echo.Context) error {
 		" JOIN `courses` ON `announcements`.`course_id` = `courses`.`id`" +
 		" JOIN `registrations` ON `courses`.`id` = `registrations`.`course_id`" +
 		" JOIN `unread_announcements` ON `announcements`.`id` = `unread_announcements`.`announcement_id`" +
-		" WHERE 1=1"
-
-	if courseID := c.QueryParam("course_id"); courseID != "" {
-		query += " AND `announcements`.`course_id` = ?"
-		args = append(args, courseID)
-	}
-
-	query += "AND `announcements`.`id` <= ?" +
-		" AND `unread_announcements`.`user_id` = ?" +
-		" AND `registrations`.`user_id` = ?" +
-		" ORDER BY " +
-		"`announcements`.`id` DESC" +
-		" LIMIT ?"
+		" WHERE 1=1" +
+		" AND `announcements`.`id` <= ?"
 
 	var page int
 	if c.QueryParam("page") == "" {
@@ -1378,20 +1367,34 @@ func (h *handlers) GetAnnouncementList(c echo.Context) error {
 	}
 	limit := 20
 	offset := limit * (page - 1)
-	// limitより多く上限を設定し、実際にlimitより多くレコードが取得できた場合は次のページが存在する
-	// offsetの削除
 
 	// 追加
 	announcementsID, err := GetSeekAnnounceMentId(tx, offset)
 	if err != nil {
+		c.Logger().Debug("TOSA_DEBUG GetSeekAnnounceMentId ERROR")
 		return c.NoContent(http.StatusInternalServerError)
 	}
+	args = append(args, announcementsID)
 
-	args = append(args, announcementsID, userID, userID)
+	if courseID := c.QueryParam("course_id"); courseID != "" {
+		query += " AND `announcements`.`course_id` = ?"
+		args = append(args, courseID)
+	}
 
+	query += " AND `unread_announcements`.`user_id` = ?" +
+		" AND `registrations`.`user_id` = ?" +
+		" ORDER BY " +
+		"`announcements`.`id` DESC" +
+		" LIMIT ?"
+
+	args = append(args, userID, userID)
+
+	// limitより多く上限を設定し、実際にlimitより多くレコードが取得できた場合は次のページが存在する
+	// offsetの削除
 	args = append(args, limit+1)
 
 	if err := tx.Select(&announcements, query, args...); err != nil {
+		log.Printf("TOSA_DEBUG:%v", query)
 		c.Logger().Error(err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
