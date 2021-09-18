@@ -618,13 +618,13 @@ func (h *handlers) GetGrades(c echo.Context) error {
 			return c.NoContent(http.StatusInternalServerError)
 		}
 
+		var myTotalScore int
+		myTotalScore = 0
+		classScores := make([]ClassScore, 0, len(classes))
 		if len(classes) != 0 {
 			// 講義毎の成績計算処理
 			// この二つの値が欲しい
 			// 先にsubmissionsのリストを取得してしまう
-			classScores := make([]ClassScore, 0, len(classes))
-			var myTotalScore int
-			myTotalScore = 0
 
 			// ここから追加
 			inquery := ""
