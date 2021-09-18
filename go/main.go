@@ -827,7 +827,7 @@ func (h *handlers) GetGrades(c echo.Context) error {
 			usermap[d.UserID] += int(d.Credit) * *d.Score
 		}
 
-		usermap2[d.UserID] += int(d.UCredit)
+		usermap2[d.UserID] = int(d.UCredit)
 	}
 
 	var gpas []float64
