@@ -579,6 +579,7 @@ type Sub struct {
 type Total struct {
 	Score    int    `db:"total_score"`
 	CourceID string `db:"id"`
+	UserID   string `db:"user_id"`
 }
 
 type ForGPA struct {
@@ -639,14 +640,28 @@ func (h *handlers) GetGrades(c echo.Context) error {
 	//
 
 	// 自分で集計する
-	totalQuery := "SELECT IFNULL(SUM(`submissions`.`score`), 0) AS `total_score`, `courses`.`id` AS id FROM `users` JOIN `registrations` ON `users`.`id` = `registrations`.`user_id` JOIN `courses` ON `registrations`.`course_id` = `courses`.`id` LEFT JOIN `classes` ON `courses`.`id` = `classes`.`course_id` LEFT JOIN `submissions` ON `users`.`id` = `submissions`.`user_id` AND `submissions`.`class_id` = `classes`.`id` WHERE `courses`.`id` IN (" +
+	totalQuery := "SELECT `submissions`.`score` AS `total_score`, `courses`.`id` AS id, `users`.`id` AS user_id FROM `users` JOIN `registrations` ON `users`.`id` = `registrations`.`user_id` JOIN `courses` ON `registrations`.`course_id` = `courses`.`id` LEFT JOIN `classes` ON `courses`.`id` = `classes`.`course_id` LEFT JOIN `submissions` ON `users`.`id` = `submissions`.`user_id` AND `submissions`.`class_id` = `classes`.`id` WHERE `courses`.`id` IN (" +
 		courceQuery +
-		") GROUP BY `users`.`id`,`courses`.`id`"
+		")"
 
 	if err := h.DB.Select(&totalsWithID, totalQuery); err != nil {
 		c.Logger().Error(err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
+
+	res := map[string]map[string]int{}
+	for _, d := range totalsWithID {
+		_, ok := res[d.UserID]
+		if !ok {
+			res[d.UserID] = map[string]int{}
+		}
+		_, ok2 := res[d.UserID][d.CourceID]
+		if !ok2 {
+			res[d.UserID][d.CourceID] = 0
+		}
+		res[d.UserID][d.CourceID] += d.Score
+	}
+
 	// var classList []Class
 	// query = "SELECT *" +
 	// 	" FROM `classes`" +
@@ -739,10 +754,8 @@ func (h *handlers) GetGrades(c echo.Context) error {
 		// course_id 391
 		// こいつを改善
 		var totals []int
-		for _, s := range totalsWithID {
-			if s.CourceID == course.ID {
-				totals = append(totals, s.Score)
-			}
+		for _, s := range res {
+			totals = append(totals, s[course.ID])
 		}
 		// query := "SELECT IFNULL(SUM(`submissions`.`score`), 0) AS `total_score`" +
 		// 	" FROM `users`" +
