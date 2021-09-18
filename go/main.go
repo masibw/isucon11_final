@@ -640,38 +640,43 @@ func (h *handlers) GetGrades(c echo.Context) error {
 		querySubmissions += inquery
 		querySubmissions += ")"
 
+		fmt.Printf("TOSA_DEBUG_IN_QUERY:%v", querySubmissions)
+
 		var submissions []Sub
 		err := h.DB.Select(&submissions, querySubmissions)
 		if err != nil && err != sql.ErrNoRows {
 			c.Logger().Error(err)
 			return c.NoContent(http.StatusInternalServerError)
 		} else if err == sql.ErrNoRows {
-		}
+			// 特に何もせずから配列
+		} else {
+			classCountMp := make(map[string]int)
+			scoreMp := make(map[string]*int)
 
-		classCountMp := make(map[string]int)
-		scoreMp := make(map[string]*int)
-
-		for _, sub := range submissions {
-			classCountMp[sub.ClassID]++
-			for _, item := range submissions {
-				if userID == item.UserID {
-					scoreMp[sub.ClassID] = item.Score
-					if item.Score != nil {
-						myTotalScore += *item.Score
+			for _, sub := range submissions {
+				classCountMp[sub.ClassID]++
+				for _, item := range submissions {
+					if userID == item.UserID {
+						scoreMp[sub.ClassID] = item.Score
+						if item.Score != nil {
+							myTotalScore += *item.Score
+						}
 					}
 				}
 			}
+
+			for _, class := range classes {
+				classScores = append(classScores, ClassScore{
+					ClassID:    class.ID,
+					Part:       class.Part,
+					Title:      class.Title,
+					Score:      scoreMp[class.ID],
+					Submitters: classCountMp[class.ID],
+				})
+			}
 		}
 
-		for _, class := range classes {
-			classScores = append(classScores, ClassScore{
-				ClassID:    class.ID,
-				Part:       class.Part,
-				Title:      class.Title,
-				Score:      scoreMp[class.ID],
-				Submitters: classCountMp[class.ID],
-			})
-		}
+		// ここまで追加
 
 		// for _, class := range classes {
 		// 	var submissionsCount int
