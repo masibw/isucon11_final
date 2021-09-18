@@ -399,25 +399,30 @@ func (h *handlers) GetRegisteredCourses(c echo.Context) error {
 
 	// 履修科目が0件の時は空配列を返却
 	res := make([]GetRegisteredCourseResponseContent, 0, len(courses))
-	for _, course := range courses {
-		var teacher User
-		if err := tx.Get(&teacher, "SELECT * FROM `users` WHERE `id` = ?", course.TeacherID); err != nil {
-			c.Logger().Error(err)
-			return c.NoContent(http.StatusInternalServerError)
-		}
 
-		res = append(res, GetRegisteredCourseResponseContent{
-			ID:        course.ID,
-			Name:      course.Name,
-			Teacher:   teacher.Name,
-			Period:    course.Period,
-			DayOfWeek: course.DayOfWeek,
-		})
+	var teachers []User
+	if err := tx.Select(&teachers, "SELECT * FROM `users`"); err != nil {
+		c.Logger().Error(err)
+		return c.NoContent(http.StatusInternalServerError)
 	}
 
 	if err := tx.Commit(); err != nil {
 		c.Logger().Error(err)
 		return c.NoContent(http.StatusInternalServerError)
+	}
+	for _, course := range courses {
+		for _, teacher := range teachers {
+			if teacher.ID == course.TeacherID {
+				res = append(res, GetRegisteredCourseResponseContent{
+					ID:        course.ID,
+					Name:      course.Name,
+					Teacher:   teacher.Name,
+					Period:    course.Period,
+					DayOfWeek: course.DayOfWeek,
+				})
+			}
+		}
+
 	}
 
 	return c.JSON(http.StatusOK, res)
