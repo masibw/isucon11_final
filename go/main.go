@@ -649,17 +649,17 @@ func (h *handlers) GetGrades(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	res := map[string]map[string]int{}
+	res1 := map[string]map[string]int{}
 	for _, d := range totalsWithID {
-		_, ok := res[d.UserID]
+		_, ok := res1[d.UserID]
 		if !ok {
-			res[d.UserID] = map[string]int{}
+			res1[d.UserID] = map[string]int{}
 		}
-		_, ok2 := res[d.UserID][d.CourceID]
+		_, ok2 := res1[d.UserID][d.CourceID]
 		if !ok2 {
-			res[d.UserID][d.CourceID] = 0
+			res1[d.UserID][d.CourceID] = 0
 		}
-		res[d.UserID][d.CourceID] += d.Score
+		res1[d.UserID][d.CourceID] += d.Score
 	}
 
 	// var classList []Class
@@ -754,7 +754,7 @@ func (h *handlers) GetGrades(c echo.Context) error {
 		// course_id 391
 		// こいつを改善
 		var totals []int
-		for _, s := range res {
+		for _, s := range res1 {
 			totals = append(totals, s[course.ID])
 		}
 		// query := "SELECT IFNULL(SUM(`submissions`.`score`), 0) AS `total_score`" +
