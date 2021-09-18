@@ -577,7 +577,7 @@ type Sub struct {
 }
 
 type Total struct {
-	Score    int    `db:"total_score"`
+	Score    *int   `db:"total_score"`
 	CourceID string `db:"id"`
 	UserID   string `db:"user_id"`
 }
@@ -659,7 +659,9 @@ func (h *handlers) GetGrades(c echo.Context) error {
 		if !ok2 {
 			res1[d.UserID][d.CourceID] = 0
 		}
-		res1[d.UserID][d.CourceID] += d.Score
+		if d.Score != nil {
+			res1[d.UserID][d.CourceID] += *d.Score
+		}
 	}
 
 	// var classList []Class
