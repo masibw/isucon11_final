@@ -715,6 +715,15 @@ func (h *handlers) GetGrades(c echo.Context) error {
 
 // ---------- Courses API ----------
 
+func GetSeekCoursesCode(db *sqlx.DB, offset int) (string, error){
+	var codes []string
+	query := `SELECT code FROM courses ORDER BY code DESC LIMIT 1 OFFSET ?`
+	if err := db.Select(&codes, query, offset); err != nil {
+		return "", err
+	}
+	return codes[0], nil
+}
+
 // SearchCourses GET /api/courses 科目検索
 func (h *handlers) SearchCourses(c echo.Context) error {
 	query := "SELECT `courses`.*, `users`.`name` AS `teacher`" +
@@ -770,6 +779,7 @@ func (h *handlers) SearchCourses(c echo.Context) error {
 		args = append(args, status)
 	}
 
+	condition += " AND `courses`.`code` >= ? "
 	condition += " ORDER BY `courses`.`code`"
 
 	var page int
@@ -784,10 +794,14 @@ func (h *handlers) SearchCourses(c echo.Context) error {
 	}
 	limit := 20
 	offset := limit * (page - 1)
-
+	code ,err := GetSeekCoursesCode(h.DB, offset)
+	if err != nil {
+		c.Logger().Error(err)
+		return c.NoContent(http.StatusInternalServerError)
+	}
 	// limitより多く上限を設定し、実際にlimitより多くレコードが取得できた場合は次のページが存在する
-	condition += " LIMIT ? OFFSET ?"
-	args = append(args, limit+1, offset)
+	condition += " LIMIT ?"
+	args = append(args, code, limit+1)
 
 	// 結果が0件の時は空配列を返却
 	res := make([]GetCourseDetailResponse, 0)
