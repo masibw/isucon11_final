@@ -824,8 +824,7 @@ func (h *handlers) GetGrades(c echo.Context) error {
 		}
 
 		if d.Score != nil {
-
-			usermap[d.UserID] += int(d.Credit) * d.Score
+			usermap[d.UserID] += int(d.Credit) * *d.Score
 		}
 
 		usermap2[d.UserID] += int(d.UCredit)
