@@ -1432,8 +1432,8 @@ func GetSeekAnnounceMentId2(tx *sqlx.Tx,query string, args []interface{} , offse
 
 	codeQuery += " ORDER BY `announcements`.`id` DESC  OFFSET ?"
 	args = append(args, 1, offset)
-	fmt.Println("masi debug: ", query, args)
-	if err := tx.Get(&id, query, args...); err != nil {
+	fmt.Println("masi debug: ", codeQuery, args)
+	if err := tx.Get(&id, codeQuery, args...); err != nil {
 		fmt.Printf("MASI_DEBGU_ERROR:%v", err)
 		return "", err
 	}
