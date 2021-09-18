@@ -1430,7 +1430,7 @@ func GetSeekAnnounceMentId2(tx *sqlx.Tx,query string, args []interface{} , offse
 
 	codeQuery := strings.Replace(query, "SELECT `announcements`.`id`, `courses`.`id` AS `course_id`, `courses`.`name` AS `course_name`, `announcements`.`title`, NOT `unread_announcements`.`is_deleted` AS `unread`", "SELECT `announcements`.`id` ", 1)
 
-	codeQuery += " ORDER BY `announcements`.`id` DESC  OFFSET ?"
+	codeQuery += " ORDER BY `announcements`.`id` DESC  LIMIT ? OFFSET ?"
 	args = append(args, 1, offset)
 	fmt.Println("masi debug: ", codeQuery, args)
 	if err := tx.Get(&id, codeQuery, args...); err != nil {
