@@ -832,7 +832,7 @@ func (h *handlers) GetGrades(c echo.Context) error {
 
 	var gpas []float64
 	for k, d := range usermap {
-		a := float64(d) / float64(usermap2[k])
+		a := float64(d) / 100 / float64(usermap2[k])
 		gpas = append(gpas, a)
 	}
 
