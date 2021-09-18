@@ -1537,7 +1537,7 @@ func (h *handlers) GetAnnouncementList(c echo.Context) error {
 
 	// 追加
 	announcementsID, err := GetSeekAnnounceMentId2(tx, query,args, offset)
-	if err != nil {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		c.Logger().Debug("TOSA_DEBUG GetSeekAnnounceMentId ERROR")
 		return c.NoContent(http.StatusInternalServerError)
 	}
@@ -1552,14 +1552,16 @@ func (h *handlers) GetAnnouncementList(c echo.Context) error {
 	// offsetの削除
 	args = append(args, limit+1)
 
+	if !errors.Is(err, sql.ErrNoRows){
 	if err := tx.Select(&announcements, query, args...); err != nil {
 		log.Printf("TOSA_DEBUG:%v", query)
 		c.Logger().Error(err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
+}
 
 	var unreadCount int
-	if err := tx.Get(&unreadCount, "SELECT COUNT(announcement_id) FROM `unread_announcements` WHERE `user_id` = ? AND NOT `is_deleted`", userID); err != nil {
+	if err := tx.Get(&unreadCount, "SELECT COUNT(*) FROM `unread_announcements` WHERE `user_id` = ? AND NOT `is_deleted`", userID); err != nil {
 		c.Logger().Error(err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
