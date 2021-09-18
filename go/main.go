@@ -1,11 +1,14 @@
 package main
 
 import (
+	"bufio"
 	"database/sql"
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"log"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"os"
@@ -1193,6 +1196,20 @@ func (h *handlers) AddClass(c echo.Context) error {
 	return c.JSON(http.StatusCreated, AddClassResponse{ClassID: classID})
 }
 
+func WriteFileByBufio(dst string, file multipart.File, perm fs.FileMode) error {
+	fp, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, perm)
+	if err != nil {
+		return err
+	}
+	defer fp.Close()
+	writer := bufio.NewWriter(fp)
+	_, err = io.Copy(writer, file)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // SubmitAssignment POST /api/courses/:courseID/classes/:classID/assignments 課題の提出
 func (h *handlers) SubmitAssignment(c echo.Context) error {
 	userID, _, _, err := getUserInfo(c)
@@ -1253,14 +1270,8 @@ func (h *handlers) SubmitAssignment(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	data, err := io.ReadAll(file)
-	if err != nil {
-		c.Logger().Error(err)
-		return c.NoContent(http.StatusInternalServerError)
-	}
-
 	dst := AssignmentsDirectory + classID + "-" + userID + ".pdf"
-	if err := os.WriteFile(dst, data, 0666); err != nil {
+	if err := WriteFileByBufio(dst, file, 0666); err != nil {
 		c.Logger().Error(err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
