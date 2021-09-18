@@ -618,62 +618,64 @@ func (h *handlers) GetGrades(c echo.Context) error {
 			return c.NoContent(http.StatusInternalServerError)
 		}
 
-		// 講義毎の成績計算処理
-		// この二つの値が欲しい
-		// 先にsubmissionsのリストを取得してしまう
-		classScores := make([]ClassScore, 0, len(classes))
-		var myTotalScore int
-		myTotalScore = 0
+		if len(classes) != 0 {
+			// 講義毎の成績計算処理
+			// この二つの値が欲しい
+			// 先にsubmissionsのリストを取得してしまう
+			classScores := make([]ClassScore, 0, len(classes))
+			var myTotalScore int
+			myTotalScore = 0
 
-		// ここから追加
-		inquery := ""
-		for idx, class := range classes {
-			if idx == 0 {
-				inquery += "'" + class.ID + "'"
+			// ここから追加
+			inquery := ""
+			for idx, class := range classes {
+				if idx == 0 {
+					inquery += "'" + class.ID + "'"
+				} else {
+					inquery += ", "
+					inquery += "'" + class.ID + "'"
+				}
+			}
+			querySubmissions := "SELECT user_id, class_id, score FROM `submissions` WHERE class_id IN ("
+			querySubmissions += inquery
+			querySubmissions += ")"
+
+			fmt.Printf("TOSA_DEBUG_IN_QUERY:%v\n", querySubmissions)
+
+			var submissions []Sub
+			err := h.DB.Select(&submissions, querySubmissions)
+			if err != nil && err != sql.ErrNoRows {
+				c.Logger().Error(err)
+				return c.NoContent(http.StatusInternalServerError)
+			} else if err == sql.ErrNoRows {
+				// 特に何もせずから配列
 			} else {
-				inquery += ", "
-				inquery += "'" + class.ID + "'"
-			}
-		}
+				classCountMp := make(map[string]int)
+				scoreMp := make(map[string]*int)
 
-		querySubmissions := "SELECT user_id, class_id, score FROM `submissions` WHERE class_id IN ("
-		querySubmissions += inquery
-		querySubmissions += ")"
-
-		fmt.Printf("TOSA_DEBUG_IN_QUERY:%v\n", querySubmissions)
-
-		var submissions []Sub
-		err := h.DB.Select(&submissions, querySubmissions)
-		if err != nil && err != sql.ErrNoRows {
-			c.Logger().Error(err)
-			return c.NoContent(http.StatusInternalServerError)
-		} else if err == sql.ErrNoRows {
-			// 特に何もせずから配列
-		} else {
-			classCountMp := make(map[string]int)
-			scoreMp := make(map[string]*int)
-
-			for _, sub := range submissions {
-				classCountMp[sub.ClassID]++
-			}
-			for _, item := range submissions {
-				if userID == item.UserID {
-					scoreMp[item.ClassID] = item.Score
-					if item.Score != nil {
-						myTotalScore += *item.Score
+				for _, sub := range submissions {
+					classCountMp[sub.ClassID]++
+				}
+				for _, item := range submissions {
+					if userID == item.UserID {
+						scoreMp[item.ClassID] = item.Score
+						if item.Score != nil {
+							myTotalScore += *item.Score
+						}
 					}
+				}
+
+				for _, class := range classes {
+					classScores = append(classScores, ClassScore{
+						ClassID:    class.ID,
+						Part:       class.Part,
+						Title:      class.Title,
+						Score:      scoreMp[class.ID],
+						Submitters: classCountMp[class.ID],
+					})
 				}
 			}
 
-			for _, class := range classes {
-				classScores = append(classScores, ClassScore{
-					ClassID:    class.ID,
-					Part:       class.Part,
-					Title:      class.Title,
-					Score:      scoreMp[class.ID],
-					Submitters: classCountMp[class.ID],
-				})
-			}
 		}
 
 		// ここまで追加
@@ -871,7 +873,7 @@ func (h *handlers) SearchCourses(c echo.Context) error {
 
 	code, err := GetSeekCoursesCode(h.DB, query, condition, args, offset)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows){
+		if errors.Is(err, sql.ErrNoRows) {
 			return c.JSON(http.StatusOK, res)
 		}
 		c.Logger().Error(err)
