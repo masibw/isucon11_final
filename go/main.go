@@ -583,6 +583,11 @@ type Sub struct {
 	Score    *int   `db:"score"`
 }
 
+type Total struct {
+	Score    int    `db:"total_score"`
+	CourceID string `db:"id"`
+}
+
 // GetGrades GET /api/users/me/grades 成績取得
 func (h *handlers) GetGrades(c echo.Context) error {
 	userID, _, _, err := getUserInfo(c)
@@ -615,6 +620,15 @@ func (h *handlers) GetGrades(c echo.Context) error {
 			courceQuery += ", "
 			courceQuery += "'" + c.ID + "'"
 		}
+	}
+
+	var totalsWithID []Total
+	totalQuery := "SELECT IFNULL(SUM(`submissions`.`score`), 0) AS `total_score` , MAX(`courses`.`id`) AS id FROM `users` JOIN `registrations` ON `users`.`id` = `registrations`.`user_id` JOIN `courses` ON `registrations`.`course_id` = `courses`.`id` LEFT JOIN `classes` ON `courses`.`id` = `classes`.`course_id` LEFT JOIN `submissions` ON `users`.`id` = `submissions`.`user_id` AND `submissions`.`class_id` = `classes`.`id` WHERE `courses`.`id` IN (" +
+		courceQuery +
+		") GROUP BY `users`.`id`"
+	if err := h.DB.Select(&totalsWithID, totalQuery); err != nil {
+		c.Logger().Error(err)
+		return c.NoContent(http.StatusInternalServerError)
 	}
 	// var classList []Class
 	// query = "SELECT *" +
@@ -701,21 +715,26 @@ func (h *handlers) GetGrades(c echo.Context) error {
 				})
 			}
 		}
-
 		// この科目を履修している学生のTotalScore一覧を取得
+		// こいつを改善
 		var totals []int
-		query := "SELECT IFNULL(SUM(`submissions`.`score`), 0) AS `total_score`" +
-			" FROM `users`" +
-			" JOIN `registrations` ON `users`.`id` = `registrations`.`user_id`" +
-			" JOIN `courses` ON `registrations`.`course_id` = `courses`.`id`" +
-			" LEFT JOIN `classes` ON `courses`.`id` = `classes`.`course_id`" +
-			" LEFT JOIN `submissions` ON `users`.`id` = `submissions`.`user_id` AND `submissions`.`class_id` = `classes`.`id`" +
-			" WHERE `courses`.`id` = ?" +
-			" GROUP BY `users`.`id`"
-		if err := h.DB.Select(&totals, query, course.ID); err != nil {
-			c.Logger().Error(err)
-			return c.NoContent(http.StatusInternalServerError)
+		for _, s := range totalsWithID {
+			if s.CourceID == course.ID {
+				totals = append(totals, s.Score)
+			}
 		}
+		// query := "SELECT IFNULL(SUM(`submissions`.`score`), 0) AS `total_score`" +
+		// 	" FROM `users`" +
+		// 	" JOIN `registrations` ON `users`.`id` = `registrations`.`user_id`" +
+		// 	" JOIN `courses` ON `registrations`.`course_id` = `courses`.`id`" +
+		// 	" LEFT JOIN `classes` ON `courses`.`id` = `classes`.`course_id`" +
+		// 	" LEFT JOIN `submissions` ON `users`.`id` = `submissions`.`user_id` AND `submissions`.`class_id` = `classes`.`id`" +
+		// 	" WHERE `courses`.`id` = ?" +
+		// 	" GROUP BY `users`.`id`"
+		// if err := h.DB.Select(&totals, query, course.ID); err != nil {
+		// 	c.Logger().Error(err)
+		// 	return c.NoContent(http.StatusInternalServerError)
+		// }
 
 		courseResults = append(courseResults, CourseResult{
 			Name:             course.Name,
