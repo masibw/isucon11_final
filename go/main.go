@@ -717,7 +717,7 @@ func (h *handlers) GetGrades(c echo.Context) error {
 
 func GetSeekCoursesCode(db *sqlx.DB, offset int) (string, error){
 	var codes []string
-	query := `SELECT code FROM courses ORDER BY code DESC LIMIT 1 OFFSET ?`
+	query := `SELECT code FROM courses ORDER BY code LIMIT 1 OFFSET ?`
 	if err := db.Select(&codes, query, offset); err != nil {
 		return "", err
 	}
