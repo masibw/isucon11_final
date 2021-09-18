@@ -375,7 +375,7 @@ func (h *handlers) GetMe(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	if val, ok := userCodes[userID]; !ok {
+	if val, ok := userCodes[userID]; ok {
 		return c.JSON(http.StatusOK, GetMeResponse{
 			Code:    val,
 			Name:    userName,
