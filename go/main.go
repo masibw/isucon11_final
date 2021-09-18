@@ -796,9 +796,13 @@ func (h *handlers) SearchCourses(c echo.Context) error {
 	}
 	limit := 20
 	offset := limit * (page - 1)
+	res := make([]GetCourseDetailResponse, 0)
 
 	code, err := GetSeekCoursesCode(h.DB, query, condition, args, offset)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows){
+			return c.JSON(http.StatusOK, res)
+		}
 		c.Logger().Error(err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
@@ -809,7 +813,6 @@ func (h *handlers) SearchCourses(c echo.Context) error {
 	args = append(args, code, limit+1)
 
 	// 結果が0件の時は空配列を返却
-	res := make([]GetCourseDetailResponse, 0)
 	if err := h.DB.Select(&res, query+condition, args...); err != nil {
 		fmt.Println("masi debug", query+condition, args)
 		c.Logger().Error(err)
