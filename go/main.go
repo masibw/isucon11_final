@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	_ "net/http/pprof"
@@ -38,7 +39,13 @@ type handlers struct {
 	DB *sqlx.DB
 }
 
+var userGradeCache map[string]GetGradeResponse
+var gradeMu sync.Mutex
+
 func main() {
+
+	// GradeCache
+	userGradeCache = make(map[string]GetGradeResponse)
 
 	go func() {
 		log.Println(http.ListenAndServe("0.0.0.0:6060", nil))
@@ -578,6 +585,12 @@ func (h *handlers) GetGrades(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
+	val, ok := userGradeCache[userID]
+	if ok {
+		c.Logger().Debug("GRADE_CACHE_TOSA:%v", val)
+		return c.JSON(http.StatusOK, val)
+	}
+
 	// 履修している科目一覧取得
 	var registeredCourses []Course
 	query := "SELECT `courses`.*" +
@@ -710,6 +723,10 @@ func (h *handlers) GetGrades(c echo.Context) error {
 		},
 		CourseResults: courseResults,
 	}
+
+	gradeMu.Lock()
+	userGradeCache[userID] = res
+	gradeMu.Unlock()
 
 	return c.JSON(http.StatusOK, res)
 }
