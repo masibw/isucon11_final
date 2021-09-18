@@ -1655,11 +1655,12 @@ func (h *handlers) AddAnnouncement(c echo.Context) error {
 	var rows []AnnoucementInsert
 	for _, user := range targets {
 		rows = append(rows, AnnoucementInsert{AnnouncementID: req.ID, UserID: user.ID})
-
 	}
-	if _, err := tx.NamedExec("INSERT INTO `unread_announcements` (`announcement_id`, `user_id`) VALUES (:announcement_id, :user_id)", rows); err != nil {
-		c.Logger().Error(err)
-		return c.NoContent(http.StatusInternalServerError)
+	if len(rows) != 0 {
+		if _, err := tx.NamedExec("INSERT INTO `unread_announcements` (`announcement_id`, `user_id`) VALUES (:announcement_id, :user_id)", rows); err != nil {
+			c.Logger().Error(err)
+			return c.NoContent(http.StatusInternalServerError)
+		}
 	}
 	if err := tx.Commit(); err != nil {
 		c.Logger().Error(err)
