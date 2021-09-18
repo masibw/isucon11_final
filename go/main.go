@@ -716,6 +716,20 @@ func (h *handlers) GetGrades(c echo.Context) error {
 
 // ---------- Courses API ----------
 
+func GetSeekCoursesCode(db *sqlx.DB, query string, condition string, args []interface{}, offset int) (string, error) {
+	var code string
+	args = append(args, offset)
+	condition += " ORDER BY `courses`.`code` "
+	codeQuery := strings.Replace(query, "SELECT `courses`.*, `users`.`name` AS `teacher`", "SELECT `courses`.`code` ", 1)
+	codeQuery += condition
+	codeQuery += ` LIMIT 1 OFFSET ?`
+	if err := db.Get(&code, codeQuery, args...); err != nil {
+		fmt.Println("masi seek debug: ", codeQuery, args)
+		return "", err
+	}
+	return code, nil
+}
+
 // SearchCourses GET /api/courses 科目検索
 func (h *handlers) SearchCourses(c echo.Context) error {
 	query := "SELECT `courses`.*, `users`.`name` AS `teacher`" +
@@ -771,8 +785,6 @@ func (h *handlers) SearchCourses(c echo.Context) error {
 		args = append(args, status)
 	}
 
-	condition += " ORDER BY `courses`.`code`"
-
 	var page int
 	if c.QueryParam("page") == "" {
 		page = 1
@@ -785,14 +797,25 @@ func (h *handlers) SearchCourses(c echo.Context) error {
 	}
 	limit := 20
 	offset := limit * (page - 1)
+	res := make([]GetCourseDetailResponse, 0)
 
+	code, err := GetSeekCoursesCode(h.DB, query, condition, args, offset)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows){
+			return c.JSON(http.StatusOK, res)
+		}
+		c.Logger().Error(err)
+		return c.NoContent(http.StatusInternalServerError)
+	}
 	// limitより多く上限を設定し、実際にlimitより多くレコードが取得できた場合は次のページが存在する
-	condition += " LIMIT ? OFFSET ?"
-	args = append(args, limit+1, offset)
+	condition += " AND `courses`.`code` >= ? "
+	condition += " ORDER BY `courses`.`code`"
+	condition += " LIMIT ?"
+	args = append(args, code, limit+1)
 
 	// 結果が0件の時は空配列を返却
-	res := make([]GetCourseDetailResponse, 0)
 	if err := h.DB.Select(&res, query+condition, args...); err != nil {
+		fmt.Println("masi debug", query+condition, args)
 		c.Logger().Error(err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
