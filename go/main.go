@@ -629,10 +629,10 @@ func (h *handlers) GetGrades(c echo.Context) error {
 		inquery := ""
 		for idx, class := range classes {
 			if idx == 0 {
-				inquery += class.ID
+				inquery += "'" + class.ID + "'"
 			} else {
 				inquery += ", "
-				inquery += class.ID
+				inquery += "'" + class.ID + "'"
 			}
 		}
 
@@ -640,7 +640,7 @@ func (h *handlers) GetGrades(c echo.Context) error {
 		querySubmissions += inquery
 		querySubmissions += ")"
 
-		fmt.Printf("TOSA_DEBUG_IN_QUERY:%v", querySubmissions)
+		fmt.Printf("TOSA_DEBUG_IN_QUERY:%v\n", querySubmissions)
 
 		var submissions []Sub
 		err := h.DB.Select(&submissions, querySubmissions)
