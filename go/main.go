@@ -1141,11 +1141,10 @@ func (h *handlers) GetClasses(c echo.Context) error {
 	defer tx.Rollback()
 
 	var count int
-	if err := tx.Get(&count, "SELECT COUNT(*) FROM `courses` WHERE `id` = ?", courseID); err != nil {
+	if err := tx.Get(&count, "SELECT id FROM `courses` WHERE `id` = ? limit 1", courseID); err != nil && err != sql.ErrNoRows {
 		c.Logger().Error(err)
 		return c.NoContent(http.StatusInternalServerError)
-	}
-	if count == 0 {
+	} else if err == sql.ErrNoRows {
 		return c.String(http.StatusNotFound, "No such course.")
 	}
 
@@ -1713,7 +1712,8 @@ func (h *handlers) GetAnnouncementDetail(c echo.Context) error {
 		" JOIN `courses` ON `courses`.`id` = `announcements`.`course_id`" +
 		" JOIN `unread_announcements` ON `unread_announcements`.`announcement_id` = `announcements`.`id`" +
 		" WHERE `announcements`.`id` = ?" +
-		" AND `unread_announcements`.`user_id` = ?"
+		" AND `unread_announcements`.`user_id` = ?" +
+		" LIMIT 1"
 	if err := tx.Get(&announcement, query, announcementID, userID); err != nil && err != sql.ErrNoRows {
 		c.Logger().Error(err)
 		return c.NoContent(http.StatusInternalServerError)
