@@ -1331,6 +1331,54 @@ func GetSeekAnnounceMentId(tx *sqlx.Tx, offset int) (string, error) {
 	return ids[0], nil
 }
 
+func GetSeekAnnounceMentIdWithWhere(c echo.Context, userID string, tx *sqlx.Tx, offset int) (string, error) {
+	var ids []string
+	var args []interface{}
+	query := "SELECT `announcements`.`id` as id" +
+		" FROM `announcements`" +
+		" JOIN `courses` ON `announcements`.`course_id` = `courses`.`id`" +
+		" JOIN `registrations` ON `courses`.`id` = `registrations`.`course_id`" +
+		" JOIN `unread_announcements` ON `announcements`.`id` = `unread_announcements`.`announcement_id`" +
+		" WHERE 1=1" +
+		" AND `announcements`.`id` <= ?"
+
+	var page int
+	var err error
+	if c.QueryParam("page") == "" {
+		page = 1
+	} else {
+		page, err = strconv.Atoi(c.QueryParam("page"))
+		if err != nil || page <= 0 {
+			// return c.String(http.StatusBadRequest, "Invalid page.")
+			return "", fmt.Errorf("hoge")
+		}
+	}
+
+	if courseID := c.QueryParam("course_id"); courseID != "" {
+		query += " AND `announcements`.`course_id` = ?"
+		args = append(args, courseID)
+	}
+
+	query += " AND `unread_announcements`.`user_id` = ?" +
+		" AND `registrations`.`user_id` = ?" +
+		" ORDER BY " +
+		"`announcements`.`id` DESC" +
+		" LIMIT 1 OFFSET ?"
+
+	args = append(args, userID, userID)
+
+	// limitより多く上限を設定し、実際にlimitより多くレコードが取得できた場合は次のページが存在する
+	// offsetの削除
+	args = append(args, offset)
+
+	if err := tx.Select(&ids, query, offset); err != nil {
+		fmt.Printf("TOSA_DEBGU_ERROR:%v", err)
+		return "", err
+	}
+	fmt.Printf("TOSA_DEBGU:%v", ids[0])
+	return ids[0], nil
+}
+
 // GetAnnouncementList GET /api/announcements お知らせ一覧取得
 func (h *handlers) GetAnnouncementList(c echo.Context) error {
 	userID, _, _, err := getUserInfo(c)
@@ -1369,7 +1417,7 @@ func (h *handlers) GetAnnouncementList(c echo.Context) error {
 	offset := limit * (page - 1)
 
 	// 追加
-	announcementsID, err := GetSeekAnnounceMentId(tx, offset)
+	announcementsID, err := GetSeekAnnounceMentIdWithWhere(c, userID, tx, offset)
 	if err != nil {
 		c.Logger().Debug("TOSA_DEBUG GetSeekAnnounceMentId ERROR")
 		return c.NoContent(http.StatusInternalServerError)
