@@ -1324,8 +1324,10 @@ func GetSeekAnnounceMentId(tx *sqlx.Tx, offset int) (string, error) {
 	var id string
 	query := `SELECT id FROM announcements ORDER BY id DESC LIMIT 1 OFFSET ?`
 	if err := tx.Select(&id, query, offset); err != nil {
+		fmt.Printf("TOSA_DEBGU_ERROR:%v", err)
 		return "", err
 	}
+	fmt.Printf("TOSA_DEBGU:%v", id)
 	return id, nil
 }
 
