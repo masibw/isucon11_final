@@ -606,17 +606,48 @@ func (h *handlers) GetGrades(c echo.Context) error {
 	courseResults := make([]CourseResult, 0, len(registeredCourses))
 	myGPA := 0.0
 	myCredits := 0
+
+	courceQuery := ""
+	for idx, c := range registeredCourses {
+		if idx == 0 {
+			courceQuery += "'" + c.ID + "'"
+		} else {
+			courceQuery += ", "
+			courceQuery += "'" + c.ID + "'"
+		}
+	}
+	var classList []Class
+	query = "SELECT *" +
+		" FROM `classes`" +
+		" WHERE `course_id` IN (" +
+		courceQuery +
+		")" +
+		" ORDER BY `part` DESC"
+	if err := h.DB.Select(&classList, query); err != nil {
+		c.Logger().Error(err)
+		return c.NoContent(http.StatusInternalServerError)
+	}
+	classMap := make(map[string]*Class)
+	for _, c := range classList {
+		classMap[c.CourseID] = &c
+	}
+
 	for _, course := range registeredCourses {
-		// 講義一覧の取得
-		var classes []Class
-		query = "SELECT *" +
-			" FROM `classes`" +
-			" WHERE `course_id` = ?" +
-			" ORDER BY `part` DESC"
-		if err := h.DB.Select(&classes, query, course.ID); err != nil {
+		classes, ok := classMap[course.ID]
+		if !ok {
 			c.Logger().Error(err)
 			return c.NoContent(http.StatusInternalServerError)
 		}
+		// 講義一覧の取得
+		// var classes []Class
+		// query = "SELECT *" +
+		// 	" FROM `classes`" +
+		// 	" WHERE `course_id` = ?" +
+		// 	" ORDER BY `part` DESC"
+		// if err := h.DB.Select(&classes, query, course.ID); err != nil {
+		// c.Logger().Error(err)
+		// return c.NoContent(http.StatusInternalServerError)
+		// }
 
 		// 講義毎の成績計算処理
 		// この二つの値が欲しい
@@ -871,7 +902,7 @@ func (h *handlers) SearchCourses(c echo.Context) error {
 
 	code, err := GetSeekCoursesCode(h.DB, query, condition, args, offset)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows){
+		if errors.Is(err, sql.ErrNoRows) {
 			return c.JSON(http.StatusOK, res)
 		}
 		c.Logger().Error(err)
