@@ -1377,7 +1377,8 @@ func (h *handlers) GetAnnouncementList(c echo.Context) error {
 	limit := 20
 	offset := limit * (page - 1)
 	// limitより多く上限を設定し、実際にlimitより多くレコードが取得できた場合は次のページが存在する
-	args = append(args, limit+1, offset)
+	// offsetの削除
+	args = append(args, limit+1)
 
 	// 追加
 	announcementsID, err := GetSeekAnnounceMentId(tx, offset)
