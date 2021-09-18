@@ -715,10 +715,11 @@ func (h *handlers) GetGrades(c echo.Context) error {
 
 // ---------- Courses API ----------
 
-func GetSeekCoursesCode(db *sqlx.DB, offset int) (string, error){
+func GetSeekCoursesCode(db *sqlx.DB, condition string, args []interface{}, offset int) (string, error) {
 	var codes []string
+	args = append(args, offset)
 	query := `SELECT code FROM courses ORDER BY code LIMIT 1 OFFSET ?`
-	if err := db.Select(&codes, query, offset); err != nil {
+	if err := db.Select(&codes, query+condition, args...); err != nil {
 		return "", err
 	}
 	return codes[0], nil
@@ -794,7 +795,8 @@ func (h *handlers) SearchCourses(c echo.Context) error {
 	}
 	limit := 20
 	offset := limit * (page - 1)
-	code ,err := GetSeekCoursesCode(h.DB, offset)
+
+	code, err := GetSeekCoursesCode(h.DB, condition, args, offset)
 	if err != nil {
 		c.Logger().Error(err)
 		return c.NoContent(http.StatusInternalServerError)
