@@ -794,7 +794,6 @@ func GetSeekCoursesCode(db *sqlx.DB, query string, condition string, args []inte
 	codeQuery += condition
 	codeQuery += ` LIMIT 1 OFFSET ?`
 	if err := db.Get(&code, codeQuery, args...); err != nil {
-		fmt.Println("masi seek debug: ", codeQuery, args)
 		return "", err
 	}
 	return code, nil
@@ -871,7 +870,7 @@ func (h *handlers) SearchCourses(c echo.Context) error {
 
 	code, err := GetSeekCoursesCode(h.DB, query, condition, args, offset)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows){
+		if errors.Is(err, sql.ErrNoRows) {
 			return c.JSON(http.StatusOK, res)
 		}
 		c.Logger().Error(err)
@@ -885,7 +884,6 @@ func (h *handlers) SearchCourses(c echo.Context) error {
 
 	// 結果が0件の時は空配列を返却
 	if err := h.DB.Select(&res, query+condition, args...); err != nil {
-		fmt.Println("masi debug", query+condition, args)
 		c.Logger().Error(err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
@@ -1414,80 +1412,17 @@ type GetAnnouncementsResponse struct {
 	Announcements []AnnouncementWithoutDetail `json:"announcements"`
 }
 
-func GetSeekAnnounceMentId(tx *sqlx.Tx, offset int) (string, error) {
-	var ids []string
-	query := `SELECT id FROM announcements ORDER BY id DESC LIMIT 1 OFFSET ?`
-	if err := tx.Select(&ids, query, offset); err != nil {
-		fmt.Printf("TOSA_DEBGU_ERROR:%v", err)
-		return "", err
-	}
-	fmt.Printf("TOSA_DEBGU:%v", ids[0])
-	return ids[0], nil
-}
-
-func GetSeekAnnounceMentId2(tx *sqlx.Tx,query string, args []interface{} , offset int) (string, error) {
+func GetSeekAnnounceMentId2(tx *sqlx.Tx, query string, args []interface{}, offset int) (string, error) {
 	var id string
 
 	codeQuery := strings.Replace(query, "SELECT `announcements`.`id`, `courses`.`id` AS `course_id`, `courses`.`name` AS `course_name`, `announcements`.`title`, NOT `unread_announcements`.`is_deleted` AS `unread`", "SELECT `announcements`.`id` ", 1)
 
 	codeQuery += " ORDER BY `announcements`.`id` DESC  LIMIT ? OFFSET ?"
 	args = append(args, 1, offset)
-	fmt.Println("masi debug: ", codeQuery, args)
 	if err := tx.Get(&id, codeQuery, args...); err != nil {
-		fmt.Printf("MASI_DEBGU_ERROR:%v", err)
 		return "", err
 	}
-	fmt.Printf("MASI_DEBGU:%v", id)
 	return id, nil
-}
-
-
-func GetSeekAnnounceMentIdWithWhere(c echo.Context, userID string, tx *sqlx.Tx, offset int) (string, error) {
-	var ids []string
-	var args []interface{}
-	query := "SELECT `announcements`.`id` as id" +
-		" FROM `announcements`" +
-		" JOIN `courses` ON `announcements`.`course_id` = `courses`.`id`" +
-		" JOIN `registrations` ON `courses`.`id` = `registrations`.`course_id`" +
-		" JOIN `unread_announcements` ON `announcements`.`id` = `unread_announcements`.`announcement_id`" +
-		" WHERE 1=1" +
-		" AND `announcements`.`id` <= ?"
-
-	var page int
-	var err error
-	if c.QueryParam("page") == "" {
-		page = 1
-	} else {
-		page, err = strconv.Atoi(c.QueryParam("page"))
-		if err != nil || page <= 0 {
-			// return c.String(http.StatusBadRequest, "Invalid page.")
-			return "", fmt.Errorf("hoge")
-		}
-	}
-
-	if courseID := c.QueryParam("course_id"); courseID != "" {
-		query += " AND `announcements`.`course_id` = ?"
-		args = append(args, courseID)
-	}
-
-	query += " AND `unread_announcements`.`user_id` = ?" +
-		" AND `registrations`.`user_id` = ?" +
-		" ORDER BY " +
-		"`announcements`.`id` DESC" +
-		" LIMIT 1 OFFSET ?"
-
-	args = append(args, userID, userID)
-
-	// limitより多く上限を設定し、実際にlimitより多くレコードが取得できた場合は次のページが存在する
-	// offsetの削除
-	args = append(args, offset)
-
-	if err := tx.Select(&ids, query, offset); err != nil {
-		fmt.Printf("TOSA_DEBGU_ERROR:%v", err)
-		return "", err
-	}
-	fmt.Printf("TOSA_DEBGU:%v", ids[0])
-	return ids[0], nil
 }
 
 // GetAnnouncementList GET /api/announcements お知らせ一覧取得
@@ -1536,29 +1471,29 @@ func (h *handlers) GetAnnouncementList(c echo.Context) error {
 	args = append(args, userID, userID)
 
 	// 追加
-	announcementsID, err := GetSeekAnnounceMentId2(tx, query,args, offset)
+	announcementsID, err := GetSeekAnnounceMentId2(tx, query, args, offset)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		c.Logger().Debug("TOSA_DEBUG GetSeekAnnounceMentId ERROR")
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	query +=	" AND `announcements`.`id` <= ?" +
-						" ORDER BY " +
-						" `announcements`.`id` DESC" +
-						" LIMIT ?"
+	query += " AND `announcements`.`id` <= ?" +
+		" ORDER BY " +
+		" `announcements`.`id` DESC" +
+		" LIMIT ?"
 	args = append(args, announcementsID)
 
 	// limitより多く上限を設定し、実際にlimitより多くレコードが取得できた場合は次のページが存在する
 	// offsetの削除
 	args = append(args, limit+1)
 
-	if !errors.Is(err, sql.ErrNoRows){
-	if err := tx.Select(&announcements, query, args...); err != nil {
-		log.Printf("TOSA_DEBUG:%v", query)
-		c.Logger().Error(err)
-		return c.NoContent(http.StatusInternalServerError)
+	if !errors.Is(err, sql.ErrNoRows) {
+		if err := tx.Select(&announcements, query, args...); err != nil {
+			log.Printf("TOSA_DEBUG:%v", query)
+			c.Logger().Error(err)
+			return c.NoContent(http.StatusInternalServerError)
+		}
 	}
-}
 
 	var unreadCount int
 	if err := tx.Get(&unreadCount, "SELECT COUNT(*) FROM `unread_announcements` WHERE `user_id` = ? AND NOT `is_deleted`", userID); err != nil {
