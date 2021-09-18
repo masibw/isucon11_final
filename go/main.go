@@ -718,8 +718,11 @@ func (h *handlers) GetGrades(c echo.Context) error {
 func GetSeekCoursesCode(db *sqlx.DB, condition string, args []interface{}, offset int) (string, error) {
 	var codes []string
 	args = append(args, offset)
-	query := `SELECT code FROM courses ORDER BY code LIMIT 1 OFFSET ?`
-	if err := db.Select(&codes, query+condition, args...); err != nil {
+	query := `SELECT code FROM courses ORDER BY code where 1=1`
+	query += condition
+	query += `LIMIT 1 OFFSET ?`
+	fmt.Println("masi seek debug: ", query, args)
+	if err := db.Select(&codes, query, args...); err != nil {
 		return "", err
 	}
 	return codes[0], nil
