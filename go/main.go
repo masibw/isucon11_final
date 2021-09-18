@@ -719,7 +719,7 @@ func GetSeekCoursesCode(db *sqlx.DB, query string, condition string, args []inte
 	var codes []string
 	args = append(args, offset)
 	query += condition
-	query += `LIMIT 1 OFFSET ?`
+	query += ` LIMIT 1 OFFSET ?`
 	fmt.Println("masi seek debug: ", query, args)
 	if err := db.Select(&codes, query, args...); err != nil {
 		return "", err
