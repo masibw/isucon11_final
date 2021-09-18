@@ -640,7 +640,7 @@ func (h *handlers) GetGrades(c echo.Context) error {
 		querySubmissions += inquery
 		querySubmissions += ")"
 
-		fmt.Printf("TOSA_DEBUG_IN_QUERY:%v\n", querySubmissions)
+		// fmt.Printf("TOSA_DEBUG_IN_QUERY:%v\n", querySubmissions)
 
 		var submissions []Sub
 		err := h.DB.Select(&submissions, querySubmissions)
@@ -656,7 +656,6 @@ func (h *handlers) GetGrades(c echo.Context) error {
 			for _, sub := range submissions {
 				classCountMp[sub.ClassID]++
 			}
-
 			for _, item := range submissions {
 				if userID == item.UserID {
 					scoreMp[item.ClassID] = item.Score
