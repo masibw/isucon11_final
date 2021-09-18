@@ -623,9 +623,10 @@ func (h *handlers) GetGrades(c echo.Context) error {
 	}
 
 	var totalsWithID []Total
-	totalQuery := "SELECT IFNULL(SUM(`submissions`.`score`), 0) AS `total_score` , MAX(`courses`.`id`) AS id,  FROM `users` JOIN `registrations` ON `users`.`id` = `registrations`.`user_id` JOIN `courses` ON `registrations`.`course_id` = `courses`.`id` LEFT JOIN `classes` ON `courses`.`id` = `classes`.`course_id` LEFT JOIN `submissions` ON `users`.`id` = `submissions`.`user_id` AND `submissions`.`class_id` = `classes`.`id` WHERE `courses`.`id` IN (" +
+	totalQuery := "SELECT IFNULL(SUM(`submissions`.`score`), 0) AS `total_score` , MAX(`courses`.`id`) AS id FROM `users` JOIN `registrations` ON `users`.`id` = `registrations`.`user_id` JOIN `courses` ON `registrations`.`course_id` = `courses`.`id` LEFT JOIN `classes` ON `courses`.`id` = `classes`.`course_id` LEFT JOIN `submissions` ON `users`.`id` = `submissions`.`user_id` AND `submissions`.`class_id` = `classes`.`id` WHERE `courses`.`id` IN (" +
 		courceQuery +
 		") GROUP BY `users`.`id`"
+
 	if err := h.DB.Select(&totalsWithID, totalQuery); err != nil {
 		c.Logger().Error(err)
 		return c.NoContent(http.StatusInternalServerError)
