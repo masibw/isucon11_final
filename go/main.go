@@ -1,11 +1,14 @@
 package main
 
 import (
+	"bufio"
 	"database/sql"
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"log"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"os"
@@ -676,62 +679,64 @@ func (h *handlers) GetGrades(c echo.Context) error {
 			return c.NoContent(http.StatusInternalServerError)
 		}
 
-		// 講義毎の成績計算処理
-		// この二つの値が欲しい
-		// 先にsubmissionsのリストを取得してしまう
-		classScores := make([]ClassScore, 0, len(classes))
 		var myTotalScore int
 		myTotalScore = 0
+		classScores := make([]ClassScore, 0, len(classes))
+		if len(classes) != 0 {
+			// 講義毎の成績計算処理
+			// この二つの値が欲しい
+			// 先にsubmissionsのリストを取得してしまう
 
-		// ここから追加
-		inquery := ""
-		for idx, class := range classes {
-			if idx == 0 {
-				inquery += "'" + class.ID + "'"
+			// ここから追加
+			inquery := ""
+			for idx, class := range classes {
+				if idx == 0 {
+					inquery += "'" + class.ID + "'"
+				} else {
+					inquery += ", "
+					inquery += "'" + class.ID + "'"
+				}
+			}
+			querySubmissions := "SELECT user_id, class_id, score FROM `submissions` WHERE class_id IN ("
+			querySubmissions += inquery
+			querySubmissions += ")"
+
+			fmt.Printf("TOSA_DEBUG_IN_QUERY:%v\n", querySubmissions)
+
+			var submissions []Sub
+			err := h.DB.Select(&submissions, querySubmissions)
+			if err != nil && err != sql.ErrNoRows {
+				c.Logger().Error(err)
+				return c.NoContent(http.StatusInternalServerError)
+			} else if err == sql.ErrNoRows {
+				// 特に何もせずから配列
 			} else {
-				inquery += ", "
-				inquery += "'" + class.ID + "'"
-			}
-		}
+				classCountMp := make(map[string]int)
+				scoreMp := make(map[string]*int)
 
-		querySubmissions := "SELECT user_id, class_id, score FROM `submissions` WHERE class_id IN ("
-		querySubmissions += inquery
-		querySubmissions += ")"
-
-		// fmt.Printf("TOSA_DEBUG_IN_QUERY:%v\n", querySubmissions)
-
-		var submissions []Sub
-		err := h.DB.Select(&submissions, querySubmissions)
-		if err != nil && err != sql.ErrNoRows {
-			c.Logger().Error(err)
-			return c.NoContent(http.StatusInternalServerError)
-		} else if err == sql.ErrNoRows {
-			// 特に何もせずから配列
-		} else {
-			classCountMp := make(map[string]int)
-			scoreMp := make(map[string]*int)
-
-			for _, sub := range submissions {
-				classCountMp[sub.ClassID]++
-			}
-			for _, item := range submissions {
-				if userID == item.UserID {
-					scoreMp[item.ClassID] = item.Score
-					if item.Score != nil {
-						myTotalScore += *item.Score
+				for _, sub := range submissions {
+					classCountMp[sub.ClassID]++
+				}
+				for _, item := range submissions {
+					if userID == item.UserID {
+						scoreMp[item.ClassID] = item.Score
+						if item.Score != nil {
+							myTotalScore += *item.Score
+						}
 					}
+				}
+
+				for _, class := range classes {
+					classScores = append(classScores, ClassScore{
+						ClassID:    class.ID,
+						Part:       class.Part,
+						Title:      class.Title,
+						Score:      scoreMp[class.ID],
+						Submitters: classCountMp[class.ID],
+					})
 				}
 			}
 
-			for _, class := range classes {
-				classScores = append(classScores, ClassScore{
-					ClassID:    class.ID,
-					Part:       class.Part,
-					Title:      class.Title,
-					Score:      scoreMp[class.ID],
-					Submitters: classCountMp[class.ID],
-				})
-			}
 		}
 		// この科目を履修している学生のTotalScore一覧を取得
 		// 三つ 1. 一人の生徒がどのコースに何点合計撮ったか
@@ -828,7 +833,6 @@ func GetSeekCoursesCode(db *sqlx.DB, query string, condition string, args []inte
 	codeQuery += condition
 	codeQuery += ` LIMIT 1 OFFSET ?`
 	if err := db.Get(&code, codeQuery, args...); err != nil {
-		fmt.Println("masi seek debug: ", codeQuery, args)
 		return "", err
 	}
 	return code, nil
@@ -919,7 +923,6 @@ func (h *handlers) SearchCourses(c echo.Context) error {
 
 	// 結果が0件の時は空配列を返却
 	if err := h.DB.Select(&res, query+condition, args...); err != nil {
-		fmt.Println("masi debug", query+condition, args)
 		c.Logger().Error(err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
@@ -1227,6 +1230,20 @@ func (h *handlers) AddClass(c echo.Context) error {
 	return c.JSON(http.StatusCreated, AddClassResponse{ClassID: classID})
 }
 
+func WriteFileByBufio(dst string, file multipart.File, perm fs.FileMode) error {
+	fp, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, perm)
+	if err != nil {
+		return err
+	}
+	defer fp.Close()
+	writer := bufio.NewWriter(fp)
+	_, err = io.Copy(writer, file)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // SubmitAssignment POST /api/courses/:courseID/classes/:classID/assignments 課題の提出
 func (h *handlers) SubmitAssignment(c echo.Context) error {
 	userID, _, _, err := getUserInfo(c)
@@ -1287,14 +1304,8 @@ func (h *handlers) SubmitAssignment(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	data, err := io.ReadAll(file)
-	if err != nil {
-		c.Logger().Error(err)
-		return c.NoContent(http.StatusInternalServerError)
-	}
-
 	dst := AssignmentsDirectory + classID + "-" + userID + ".pdf"
-	if err := os.WriteFile(dst, data, 0666); err != nil {
+	if err := WriteFileByBufio(dst, file, 0666); err != nil {
 		c.Logger().Error(err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
@@ -1448,6 +1459,19 @@ type GetAnnouncementsResponse struct {
 	Announcements []AnnouncementWithoutDetail `json:"announcements"`
 }
 
+func GetSeekAnnounceMentId2(tx *sqlx.Tx, query string, args []interface{}, offset int) (string, error) {
+	var id string
+
+	codeQuery := strings.Replace(query, "SELECT `announcements`.`id`, `courses`.`id` AS `course_id`, `courses`.`name` AS `course_name`, `announcements`.`title`, NOT `unread_announcements`.`is_deleted` AS `unread`", "SELECT `announcements`.`id` ", 1)
+
+	codeQuery += " ORDER BY `announcements`.`id` DESC  LIMIT ? OFFSET ?"
+	args = append(args, 1, offset)
+	if err := tx.Get(&id, codeQuery, args...); err != nil {
+		return "", err
+	}
+	return id, nil
+}
+
 // GetAnnouncementList GET /api/announcements お知らせ一覧取得
 func (h *handlers) GetAnnouncementList(c echo.Context) error {
 	userID, _, _, err := getUserInfo(c)
@@ -1472,17 +1496,6 @@ func (h *handlers) GetAnnouncementList(c echo.Context) error {
 		" JOIN `unread_announcements` ON `announcements`.`id` = `unread_announcements`.`announcement_id`" +
 		" WHERE 1=1"
 
-	if courseID := c.QueryParam("course_id"); courseID != "" {
-		query += " AND `announcements`.`course_id` = ?"
-		args = append(args, courseID)
-	}
-
-	query += " AND `unread_announcements`.`user_id` = ?" +
-		" AND `registrations`.`user_id` = ?" +
-		" ORDER BY `announcements`.`id` DESC" +
-		" LIMIT ? OFFSET ?"
-	args = append(args, userID, userID)
-
 	var page int
 	if c.QueryParam("page") == "" {
 		page = 1
@@ -1494,12 +1507,39 @@ func (h *handlers) GetAnnouncementList(c echo.Context) error {
 	}
 	limit := 20
 	offset := limit * (page - 1)
-	// limitより多く上限を設定し、実際にlimitより多くレコードが取得できた場合は次のページが存在する
-	args = append(args, limit+1, offset)
 
-	if err := tx.Select(&announcements, query, args...); err != nil {
-		c.Logger().Error(err)
+	if courseID := c.QueryParam("course_id"); courseID != "" {
+		query += " AND `announcements`.`course_id` = ?"
+		args = append(args, courseID)
+	}
+
+	query += " AND `unread_announcements`.`user_id` = ?" +
+		" AND `registrations`.`user_id` = ?"
+	args = append(args, userID, userID)
+
+	// 追加
+	announcementsID, err := GetSeekAnnounceMentId2(tx, query, args, offset)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		c.Logger().Debug("TOSA_DEBUG GetSeekAnnounceMentId ERROR")
 		return c.NoContent(http.StatusInternalServerError)
+	}
+
+	query += " AND `announcements`.`id` <= ?" +
+		" ORDER BY " +
+		" `announcements`.`id` DESC" +
+		" LIMIT ?"
+	args = append(args, announcementsID)
+
+	// limitより多く上限を設定し、実際にlimitより多くレコードが取得できた場合は次のページが存在する
+	// offsetの削除
+	args = append(args, limit+1)
+
+	if !errors.Is(err, sql.ErrNoRows) {
+		if err := tx.Select(&announcements, query, args...); err != nil {
+			log.Printf("TOSA_DEBUG:%v", query)
+			c.Logger().Error(err)
+			return c.NoContent(http.StatusInternalServerError)
+		}
 	}
 
 	var unreadCount int
