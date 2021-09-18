@@ -1402,6 +1402,22 @@ func GetSeekAnnounceMentId(tx *sqlx.Tx, offset int) (string, error) {
 	return ids[0], nil
 }
 
+func GetSeekAnnounceMentId2(tx *sqlx.Tx,query string, args []interface{} , offset int) (string, error) {
+	var id string
+
+	codeQuery := strings.Replace(query, "SELECT `announcements`.`id`, `courses`.`id` AS `course_id`, `courses`.`name` AS `course_name`, `announcements`.`title`, NOT `unread_announcements`.`is_deleted` AS `unread`", "SELECT `announcements`.`id` ", 1)
+
+	codeQuery += ` OFFSET ?`
+	args = append(args, 1, offset)
+	if err := tx.Get(&id, query, args...); err != nil {
+		fmt.Printf("MASI_DEBGU_ERROR:%v", err)
+		return "", err
+	}
+	fmt.Printf("MASI_DEBGU:%v", id)
+	return id, nil
+}
+
+
 func GetSeekAnnounceMentIdWithWhere(c echo.Context, userID string, tx *sqlx.Tx, offset int) (string, error) {
 	var ids []string
 	var args []interface{}
@@ -1487,14 +1503,6 @@ func (h *handlers) GetAnnouncementList(c echo.Context) error {
 	limit := 20
 	offset := limit * (page - 1)
 
-	// 追加
-	announcementsID, err := GetSeekAnnounceMentIdWithWhere(c, userID, tx, offset)
-	if err != nil {
-		c.Logger().Debug("TOSA_DEBUG GetSeekAnnounceMentId ERROR")
-		return c.NoContent(http.StatusInternalServerError)
-	}
-	args = append(args, announcementsID)
-
 	if courseID := c.QueryParam("course_id"); courseID != "" {
 		query += " AND `announcements`.`course_id` = ?"
 		args = append(args, courseID)
@@ -1505,6 +1513,15 @@ func (h *handlers) GetAnnouncementList(c echo.Context) error {
 		" ORDER BY " +
 		"`announcements`.`id` DESC" +
 		" LIMIT ?"
+
+
+	// 追加
+	announcementsID, err := GetSeekAnnounceMentId2(tx, query,args, offset)
+	if err != nil {
+		c.Logger().Debug("TOSA_DEBUG GetSeekAnnounceMentId ERROR")
+		return c.NoContent(http.StatusInternalServerError)
+	}
+	args = append(args, announcementsID)
 
 	args = append(args, userID, userID)
 
