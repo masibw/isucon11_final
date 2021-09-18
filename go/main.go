@@ -581,6 +581,13 @@ type Total struct {
 	CourceID string `db:"id"`
 }
 
+type ForGPA struct {
+	Score   *int   `db:"score"`
+	Credit  uint8  `db:"credit"`
+	UCredit uint8  `db:"u_credit"`
+	UserID  string `db:"user_id"`
+}
+
 // GetGrades GET /api/users/me/grades 成績取得
 func (h *handlers) GetGrades(c echo.Context) error {
 	userID, _, _, err := getUserInfo(c)
@@ -774,8 +781,8 @@ func (h *handlers) GetGrades(c echo.Context) error {
 	// GPAの統計値
 	// 一つでも修了した科目がある学生のGPA一覧
 	// course -> class -> submission <- user
-	var gpas []float64
-	query = "SELECT IFNULL(SUM(`submissions`.`score` * `courses`.`credit`), 0) / 100 / `credits`.`credits` AS `gpa`" +
+	var data []ForGPA
+	query = "SELECT `submissions`.`score` AS `score`, `courses`.`credit` AS `credit`,`credits`.`credits` AS `u_credit`, `users`.`id` AS `user_id`" +
 		" FROM `users`" +
 		" JOIN (" +
 		"     SELECT `users`.`id` AS `user_id`, SUM(`courses`.`credit`) AS `credits`" +
@@ -788,11 +795,32 @@ func (h *handlers) GetGrades(c echo.Context) error {
 		" JOIN `courses` ON `registrations`.`course_id` = `courses`.`id` AND `courses`.`status` = ?" +
 		" LEFT JOIN `classes` ON `courses`.`id` = `classes`.`course_id`" +
 		" LEFT JOIN `submissions` ON `users`.`id` = `submissions`.`user_id` AND `submissions`.`class_id` = `classes`.`id`" +
-		" WHERE `users`.`type` = ?" +
-		" GROUP BY `users`.`id`"
-	if err := h.DB.Select(&gpas, query, StatusClosed, StatusClosed, Student); err != nil {
+		" WHERE `users`.`type` = ?"
+	if err := h.DB.Select(&data, query, StatusClosed, StatusClosed, Student); err != nil {
 		c.Logger().Error(err)
 		return c.NoContent(http.StatusInternalServerError)
+	}
+
+	usermap := map[string]int{}
+	// 単位数
+	usermap2 := map[string]int{}
+	for _, d := range data {
+		_, ok := usermap[d.UserID]
+		if !ok {
+			usermap[d.UserID] = 0
+		}
+
+		if d.Score != nil {
+			usermap[d.UserID] += int(d.Credit) * *d.Score
+		}
+
+		usermap2[d.UserID] = int(d.UCredit)
+	}
+
+	var gpas []float64
+	for k, d := range usermap {
+		a := float64(d) / 100 / float64(usermap2[k])
+		gpas = append(gpas, a)
 	}
 
 	res := GetGradeResponse{
