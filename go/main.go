@@ -1321,14 +1321,14 @@ type GetAnnouncementsResponse struct {
 }
 
 func GetSeekAnnounceMentId(tx *sqlx.Tx, offset int) (string, error) {
-	var id string
+	var ids []string
 	query := `SELECT id FROM announcements ORDER BY id DESC LIMIT 1 OFFSET ?`
-	if err := tx.Select(&id, query, offset); err != nil {
+	if err := tx.Select(&ids, query, offset); err != nil {
 		fmt.Printf("TOSA_DEBGU_ERROR:%v", err)
 		return "", err
 	}
-	fmt.Printf("TOSA_DEBGU:%v", id)
-	return id, nil
+	fmt.Printf("TOSA_DEBGU:%v", ids[0])
+	return ids[0], nil
 }
 
 // GetAnnouncementList GET /api/announcements お知らせ一覧取得
