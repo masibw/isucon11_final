@@ -616,38 +616,33 @@ func (h *handlers) GetGrades(c echo.Context) error {
 			courceQuery += "'" + c.ID + "'"
 		}
 	}
-	var classList []Class
-	query = "SELECT *" +
-		" FROM `classes`" +
-		" WHERE `course_id` IN (" +
-		courceQuery +
-		")" +
-		" ORDER BY `part` DESC"
-	if err := h.DB.Select(&classList, query); err != nil {
-		c.Logger().Error(err)
-		return c.NoContent(http.StatusInternalServerError)
-	}
-	classMap := make(map[string]*Class)
-	for _, c := range classList {
-		classMap[c.CourseID] = &c
-	}
+	// var classList []Class
+	// query = "SELECT *" +
+	// 	" FROM `classes`" +
+	// 	" WHERE `course_id` IN (" +
+	// 	courceQuery +
+	// 	")" +
+	// 	" ORDER BY `part` DESC"
+	// if err := h.DB.Select(&classList, query); err != nil {
+	// 	c.Logger().Error(err)
+	// 	return c.NoContent(http.StatusInternalServerError)
+	// }
+	// classMap := make(map[string]*Class)
+	// for _, c := range classList {
+	// 	classMap[c.CourseID] = &c
+	// }
 
 	for _, course := range registeredCourses {
-		classes, ok := classMap[course.ID]
-		if !ok {
+		// 講義一覧の取得
+		var classes []Class
+		query = "SELECT *" +
+			" FROM `classes`" +
+			" WHERE `course_id` = ?" +
+			" ORDER BY `part` DESC"
+		if err := h.DB.Select(&classes, query, course.ID); err != nil {
 			c.Logger().Error(err)
 			return c.NoContent(http.StatusInternalServerError)
 		}
-		// 講義一覧の取得
-		// var classes []Class
-		// query = "SELECT *" +
-		// 	" FROM `classes`" +
-		// 	" WHERE `course_id` = ?" +
-		// 	" ORDER BY `part` DESC"
-		// if err := h.DB.Select(&classes, query, course.ID); err != nil {
-		// c.Logger().Error(err)
-		// return c.NoContent(http.StatusInternalServerError)
-		// }
 
 		// 講義毎の成績計算処理
 		// この二つの値が欲しい
@@ -706,40 +701,6 @@ func (h *handlers) GetGrades(c echo.Context) error {
 				})
 			}
 		}
-
-		// ここまで追加
-
-		// for _, class := range classes {
-		// 	var submissionsCount int
-		// 	if err := h.DB.Get(&submissionsCount, "SELECT COUNT(*) FROM `submissions` WHERE `class_id` = ?", class.ID); err != nil {
-		// 		c.Logger().Error(err)
-		// 		return c.NoContent(http.StatusInternalServerError)
-		// 	}
-
-		// 	var myScore sql.NullInt64
-		// 	if err := h.DB.Get(&myScore, "SELECT `submissions`.`score` FROM `submissions` WHERE `user_id` = ? AND `class_id` = ?", userID, class.ID); err != nil && err != sql.ErrNoRows {
-		// 		c.Logger().Error(err)
-		// 		return c.NoContent(http.StatusInternalServerError)
-		// 	} else if err == sql.ErrNoRows || !myScore.Valid {
-		// 		classScores = append(classScores, ClassScore{
-		// 			ClassID:    class.ID,
-		// 			Part:       class.Part,
-		// 			Title:      class.Title,
-		// 			Score:      nil,
-		// 			Submitters: submissionsCount,
-		// 		})
-		// 	} else {
-		// 		score := int(myScore.Int64)
-		// 		myTotalScore += score
-		// 		classScores = append(classScores, ClassScore{
-		// 			ClassID:    class.ID,
-		// 			Part:       class.Part,
-		// 			Title:      class.Title,
-		// 			Score:      &score,
-		// 			Submitters: submissionsCount,
-		// 		})
-		// 	}
-		// }
 
 		// この科目を履修している学生のTotalScore一覧を取得
 		var totals []int
