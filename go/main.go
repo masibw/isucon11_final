@@ -1380,7 +1380,6 @@ func (h *handlers) GetAnnouncementList(c echo.Context) error {
 	offset := limit * (page - 1)
 	// limitより多く上限を設定し、実際にlimitより多くレコードが取得できた場合は次のページが存在する
 	// offsetの削除
-	args = append(args, limit+1)
 
 	// 追加
 	announcementsID, err := GetSeekAnnounceMentId(tx, offset)
@@ -1389,6 +1388,8 @@ func (h *handlers) GetAnnouncementList(c echo.Context) error {
 	}
 
 	args = append(args, announcementsID, userID, userID)
+
+	args = append(args, limit+1)
 
 	if err := tx.Select(&announcements, query, args...); err != nil {
 		c.Logger().Error(err)
