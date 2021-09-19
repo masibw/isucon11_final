@@ -109,6 +109,8 @@ type InitializeResponse struct {
 	Language string `json:"language"`
 }
 
+var userCodes map[string]string
+
 // Initialize POST /initialize 初期化エンドポイント
 func (h *handlers) Initialize(c echo.Context) error {
 	dbForInit, _ := GetDB(true)
@@ -137,6 +139,21 @@ func (h *handlers) Initialize(c echo.Context) error {
 	if err := exec.Command("cp", "-r", InitDataDirectory, AssignmentsDirectory).Run(); err != nil {
 		c.Logger().Error(err)
 		return c.NoContent(http.StatusInternalServerError)
+	}
+	type UserCode struct {
+		ID   string `db:"id"`
+		Code string `db:"code"`
+	}
+
+	var userCodesArray []UserCode
+	if err := h.DB.Select(&userCodesArray, "SELECT `ID` `code` FROM `users`"); err != nil {
+		c.Logger().Error(err)
+		return c.NoContent(http.StatusInternalServerError)
+	}
+
+	userCodes = make(map[string]string, len(userCodesArray))
+	for _, user := range userCodesArray {
+		userCodes[user.ID] = user.Code
 	}
 
 	res := InitializeResponse{
@@ -349,6 +366,14 @@ func (h *handlers) GetMe(c echo.Context) error {
 	if err != nil {
 		c.Logger().Error(err)
 		return c.NoContent(http.StatusInternalServerError)
+	}
+
+	if val, ok := userCodes[userID]; ok {
+		return c.JSON(http.StatusOK, GetMeResponse{
+			Code:    val,
+			Name:    userName,
+			IsAdmin: isAdmin,
+		})
 	}
 
 	var userCode string
